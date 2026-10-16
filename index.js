@@ -166,7 +166,7 @@ client.on(Events.GuildMemberAdd, async (member) => {
 
   await channel.send({
     content:
-      `${member} has been invited by <@${inviterId}> and has now ${total} invite${total === 1 ? '' : 's'}.`,
+      `${member} foi convidado(a) por <@${inviterId}> e agora tem ${total} convite${total === 1 ? '' : 's'}.`,
   }).catch((err) => console.error('Erro ao enviar mensagem de invite:', err.message));
 });
 
