@@ -7,6 +7,7 @@ const {
   Partials,
   Events,
   EmbedBuilder,
+  SlashCommandBuilder,
 } = require('discord.js');
 
 const client = new Client({
@@ -70,6 +71,25 @@ client.once(Events.ClientReady, async (c) => {
 
   for (const guild of c.guilds.cache.values()) {
     await cacheGuildInvites(guild);
+  }
+
+  try {
+    await client.application.commands.set([
+      new SlashCommandBuilder()
+        .setName('invites')
+        .setDescription('Mostra quantos convites uma pessoa já trouxe.')
+        .addUserOption((opt) =>
+          opt
+            .setName('usuario')
+            .setDescription('De quem você quer ver os convites (padrão: você mesmo)')
+            .setRequired(false)
+        ),
+      new SlashCommandBuilder()
+        .setName('invites-leaderboard')
+        .setDescription('Mostra o ranking de quem mais convidou pessoas pro servidor.'),
+    ]);
+  } catch (err) {
+    console.error('Falha ao registrar comandos:', err);
   }
 });
 
@@ -153,6 +173,50 @@ client.on(Events.GuildMemberAdd, async (member) => {
 // Quando o bot entra em um servidor novo, cacheia os invites dele
 client.on(Events.GuildCreate, async (guild) => {
   await cacheGuildInvites(guild);
+});
+
+// ---------- Comandos de barra ----------
+
+client.on(Events.InteractionCreate, async (interaction) => {
+  if (!interaction.isChatInputCommand()) return;
+
+  if (interaction.commandName === 'invites') {
+    const target = interaction.options.getUser('usuario') || interaction.user;
+    const total = inviteCounts[target.id] || 0;
+
+    await interaction.reply({
+      content:
+        target.id === interaction.user.id
+          ? `Você já convidou **${total}** pessoa${total === 1 ? '' : 's'} pro servidor.`
+          : `<@${target.id}> já convidou **${total}** pessoa${total === 1 ? '' : 's'} pro servidor.`,
+    });
+    return;
+  }
+
+  if (interaction.commandName === 'invites-leaderboard') {
+    const sorted = Object.entries(inviteCounts)
+      .filter(([, count]) => count > 0)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 10);
+
+    if (sorted.length === 0) {
+      await interaction.reply({ content: 'Ainda não tem ninguém no ranking de convites.' });
+      return;
+    }
+
+    const medals = ['🥇', '🥈', '🥉'];
+    const lines = sorted.map(([userId, count], i) => {
+      const prefix = medals[i] || `${i + 1}.`;
+      return `${prefix} <@${userId}> — **${count}** convite${count === 1 ? '' : 's'}`;
+    });
+
+    const embed = new EmbedBuilder()
+      .setTitle('🏆 Ranking de Convites')
+      .setDescription(lines.join('\n'))
+      .setColor(0x5865f2);
+
+    await interaction.reply({ embeds: [embed] });
+  }
 });
 
 client.login(process.env.DISCORD_TOKEN);
